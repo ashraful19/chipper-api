@@ -2,17 +2,17 @@
 
 namespace Database\Seeders;
 
-use App\Models\Favorites;
+use App\Models\Favorite;
 use Illuminate\Database\Seeder;
 
-class FavoritesSeeder extends Seeder
+class FavoriteSeeder extends Seeder
 {
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        Favorites::factory()
+        Favorite::factory()
             ->count(5)
             ->create();
     }

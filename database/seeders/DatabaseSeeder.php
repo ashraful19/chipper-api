@@ -19,8 +19,8 @@ class DatabaseSeeder extends Seeder
                 'password' => \Hash::make('admin'),
             ]);
 
-        $this->call(FavoritesSeeder::class);
-        $this->call(PostsSeeder::class);
+        $this->call(FavoriteSeeder::class);
+        $this->call(PostSeeder::class);
         $this->call(UserSeeder::class);
     }
 }
