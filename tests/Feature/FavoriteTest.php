@@ -146,4 +146,51 @@ class FavoriteTest extends TestCase
             ->deleteJson(route('users.favorites.destroy', ['user' => $userToFavorite]))
             ->assertNotFound();
     }
+
+    public function test_a_user_can_view_his_favorites()
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $favoritedUser = User::factory()->create();
+
+        $post->favoritedBy()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $favoritedUser->favoritedBy()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson(route('favorites.index'))
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'posts' => [
+                        '*' => ['id', 'title', 'body', 'user' => ['id', 'name']]
+                    ],
+                    'users' => [
+                        '*' => ['id', 'name']
+                    ]
+                ]
+            ]);
+
+        $this->assertCount(1, $response->json('data.posts'));
+        $this->assertCount(1, $response->json('data.users'));
+    }
+
+    public function test_a_user_with_no_favorites_gets_empty_arrays()
+    {
+        $user = User::factory()->create();
+        
+        $this->actingAs($user)
+            ->getJson(route('favorites.index'))
+            ->assertOk()
+            ->assertJson([
+                'data' => [
+                    'posts' => [],
+                    'users' => [],
+                ]
+            ]);
+    }
 }

@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use App\Http\Requests\CreateFavoriteRequest;
-use App\Http\Resources\FavoriteResource;
+use App\Http\Resources\FavoriteCollection;
 use App\Models\User;
 use Illuminate\Http\Response;
 
@@ -18,8 +18,18 @@ class FavoriteController extends Controller
 {
     public function index(Request $request)
     {
-        $favorites = $request->user()->favorites;
-        return FavoriteResource::collection($favorites);
+        $favorites = $request->user()
+            ->favorites()
+            ->with([
+                'favoritable' => function ($morphTo) {
+                    $morphTo->morphWith([
+                        Post::class => ['user'],
+                    ]);
+                },
+            ])
+            ->get();
+
+        return new FavoriteCollection($favorites);
     }
 
     public function store(CreateFavoriteRequest $request, ?Post $post = null, ?User $user = null)
