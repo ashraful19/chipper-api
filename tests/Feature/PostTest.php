@@ -2,9 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Events\PostCreated;
+use App\Listeners\SendPostCreatedNotificationToAuthorFollowers;
 use Illuminate\Support\Arr;
 use App\Models\User;
+use App\Notifications\PostCreated as PostCreatedNotification;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class PostTest extends TestCase
@@ -124,5 +129,79 @@ class PostTest extends TestCase
         $this->assertDatabaseMissing('posts', [
             'id' => $id,
         ]);
+    }
+
+    public function test_post_created_event_is_dispatched_when_post_is_created()
+    {
+        Event::fake();
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson(route('posts.store'), [
+            'title' => 'Test Post',
+            'body' => 'This is a test post.',
+        ]);
+
+        $createdPostId = Arr::get($response->json(), 'data.id');
+
+        $this->assertDatabaseHas('posts', [
+            'title' => 'Test Post',
+            'body' => 'This is a test post.',
+            'id' => $createdPostId,
+        ]);
+
+        Event::assertDispatched(PostCreated::class, fn($event) => $event->post->id === $createdPostId && $event->post->user_id === $user->id);
+    }
+
+    public function test_send_post_created_notification_listener_is_registered()
+    {
+        Event::fake();
+
+        Event::assertListening(PostCreated::class, SendPostCreatedNotificationToAuthorFollowers::class);
+    }
+
+    public function test_followers_receive_post_created_notification()
+    {
+        Notification::fake();
+
+        $postAuthor = User::factory()->create();
+        $follower1 = User::factory()->create();
+        $follower2 = User::factory()->create();
+
+        $postAuthor->favoritedBy()->create([
+            'user_id' => $follower1->id,
+        ]);
+
+        $postAuthor->favoritedBy()->create([
+            'user_id' => $follower2->id,
+        ]);
+
+        $response = $this->actingAs($postAuthor)->postJson(route('posts.store'), [
+            'title' => 'New post',
+            'body'  => 'Post body',
+        ]);
+    
+        $response->assertCreated();
+
+        Notification::assertSentTo(
+            [$follower1, $follower2],
+            PostCreatedNotification::class
+        );
+    }
+
+    public function test_no_notifications_sent_when_author_has_no_followers()
+    {
+        Notification::fake();
+
+        $postAuthor = User::factory()->create();
+
+        $response = $this->actingAs($postAuthor)->postJson(route('posts.store'), [
+            'title' => 'New post',
+            'body'  => 'Post body',
+        ]);
+        
+        $response->assertCreated();
+
+        Notification::assertNothingSent();
     }
 }
