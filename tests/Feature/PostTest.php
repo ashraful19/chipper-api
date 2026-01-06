@@ -8,8 +8,10 @@ use Illuminate\Support\Arr;
 use App\Models\User;
 use App\Notifications\PostCreated as PostCreatedNotification;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PostTest extends TestCase
@@ -203,5 +205,35 @@ class PostTest extends TestCase
         $response->assertCreated();
 
         Notification::assertNothingSent();
+    }
+
+    public function test_a_user_can_create_a_post_with_image() 
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson(route('posts.store'), [
+            'title' => 'New post',
+            'body'  => 'Post body',
+            'image' => UploadedFile::fake()->image('test.jpg')->size(1024),
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonStructure([
+                'data' => [
+                    'id', 'title', 'body', 'image',
+                ]
+            ]);
+
+        $imagePath = str_replace(url('/storage') . '/', '', $response->json('data.image'));
+
+        $this->assertDatabaseHas('posts', [
+            'title' => 'New post',
+            'body'  => 'Post body',
+            'image' => $imagePath,
+        ]);
+
+        Storage::disk('public')->assertExists($imagePath);
     }
 }
